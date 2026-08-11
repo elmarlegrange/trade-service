@@ -5,7 +5,7 @@ namespace TradeService.Domain.Dtos.Trade;
 public record TradeIngestionRequest(
     string ExternalRef,
     string AccountId,
-    InstrumentDto Instrument,
+    string Isin,
     TradeSide Side,
     decimal Quantity,
     decimal Price,

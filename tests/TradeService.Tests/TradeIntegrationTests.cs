@@ -19,6 +19,7 @@ public class TradeIntegrationTests(TradeServiceApiFactory factory) : IClassFixtu
         // Arrange
         var accountId = "ACC-E2E-100";
         var externalRef = "TRD-E2E-888";
+        var isin = "US0378331005";
         var tradeDate = new DateOnly(2025, 3, 1);
         var initialAsOf = new DateTimeOffset(2025, 3, 1, 9, 0, 0, TimeSpan.Zero);
         var duplicateAsOf = new DateTimeOffset(2025, 3, 1, 8, 50, 0, TimeSpan.Zero);
@@ -28,7 +29,7 @@ public class TradeIntegrationTests(TradeServiceApiFactory factory) : IClassFixtu
         var initialTradeRequest = new TradeIngestionRequest(
             ExternalRef: externalRef,
             AccountId: accountId,
-            Instrument: new InstrumentDto("US0378331005", "AAPL"),
+            Isin: isin,
             Side: TradeSide.Buy,
             Quantity: 100m,
             Price: 150.00m,
@@ -49,7 +50,7 @@ public class TradeIntegrationTests(TradeServiceApiFactory factory) : IClassFixtu
         var duplicateTradeRequest = new TradeIngestionRequest(
             ExternalRef: externalRef,
             AccountId: accountId,
-            Instrument: new InstrumentDto("US0378331005", "AAPL"),
+            Isin: isin,
             Side: TradeSide.Buy,
             Quantity: 100m,
             Price: 150.00m,
@@ -69,7 +70,7 @@ public class TradeIntegrationTests(TradeServiceApiFactory factory) : IClassFixtu
         var correctionTradeRequest = new TradeIngestionRequest(
             ExternalRef: externalRef,
             AccountId: accountId,
-            Instrument: new InstrumentDto("US0378331005", "AAPL"),
+            Isin: isin,
             Side: TradeSide.Buy,
             Quantity: 120m,
             Price: 150.00m,
@@ -98,7 +99,6 @@ public class TradeIntegrationTests(TradeServiceApiFactory factory) : IClassFixtu
 
         var position = snapshotResponseBody.Positions.Single();
         position.Isin.Should().Be("US0378331005");
-        position.Symbol.Should().Be("AAPL");
         position.Quantity.Should().Be(120m);
         position.AverageUnitCostUsd.Should().Be(150.00m);
         position.PriceUsd.Should().Be(150.00m);

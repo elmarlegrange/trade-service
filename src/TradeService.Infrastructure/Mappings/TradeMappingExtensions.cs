@@ -12,14 +12,13 @@ public static class TradeMappingExtensions
             Id = Guid.NewGuid(),
             ExternalRef = req.ExternalRef,
             AccountId = req.AccountId,
-            Isin = req.Instrument.Isin,
-            Symbol = req.Instrument.Symbol,
+            Isin = req.Isin,
             Side = req.Side,
             Quantity = req.Quantity,
             Price = req.Price,
             TradeDate = req.TradeDate,
             AsOf = req.AsOf,
-            CreatedAtUtc = DateTimeOffset.UtcNow
+            CreatedAt = DateTimeOffset.UtcNow
         };
     }
 }

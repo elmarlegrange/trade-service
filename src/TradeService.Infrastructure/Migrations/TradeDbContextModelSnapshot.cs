@@ -98,7 +98,7 @@ namespace TradeService.Infrastructure.Migrations
                     b.Property<DateTimeOffset>("AsOf")
                         .HasColumnType("datetimeoffset");
 
-                    b.Property<DateTimeOffset>("CreatedAtUtc")
+                    b.Property<DateTimeOffset>("CreatedAt")
                         .HasColumnType("datetimeoffset");
 
                     b.Property<string>("ExternalRef")
@@ -122,11 +122,6 @@ namespace TradeService.Infrastructure.Migrations
                         .IsRequired()
                         .HasMaxLength(10)
                         .HasColumnType("nvarchar(10)");
-
-                    b.Property<string>("Symbol")
-                        .IsRequired()
-                        .HasMaxLength(20)
-                        .HasColumnType("nvarchar(20)");
 
                     b.Property<DateOnly>("TradeDate")
                         .HasColumnType("date");

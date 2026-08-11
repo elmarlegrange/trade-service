@@ -16,13 +16,13 @@ public class PortfolioService(TradeDbContext dbContext) : IPortfolioSnapshotServ
         
         var activeTrades = rawTrades
             .GroupBy(t => t.ExternalRef)
-            .Select(g => g.OrderByDescending(t => t.AsOf).ThenByDescending(t => t.CreatedAtUtc).First())
+            .Select(g => g.OrderByDescending(t => t.AsOf).ThenByDescending(t => t.CreatedAt).First())
             .ToList();
 
         var positions = new List<PositionSnapshotDto>();
-        
+
         var instrumentGroups = activeTrades
-            .GroupBy(t => new { t.Isin, t.Symbol })
+            .GroupBy(t => t.Isin)
             .ToList();
 
         foreach (var group in instrumentGroups)
@@ -30,7 +30,7 @@ public class PortfolioService(TradeDbContext dbContext) : IPortfolioSnapshotServ
             var orderedTrades = group
                 .OrderBy(t => t.TradeDate)
                 .ThenBy(t => t.AsOf)
-                .ThenBy(t => t.CreatedAtUtc)
+                .ThenBy(t => t.CreatedAt)
                 .ToList();
 
             var runningQty = 0m;
@@ -79,7 +79,7 @@ public class PortfolioService(TradeDbContext dbContext) : IPortfolioSnapshotServ
             var averageUnitCostUsd = runningQty > 0 ? (totalCostBasis / runningQty) : 0m;
             
             var priceRecord = await dbContext.Prices
-                .Where(p => p.Isin == group.Key.Isin && p.PriceDate <= date)
+                .Where(p => p.Isin == group.Key && p.PriceDate <= date)
                 .OrderByDescending(p => p.PriceDate)
                 .FirstOrDefaultAsync(ct);
 
@@ -116,8 +116,7 @@ public class PortfolioService(TradeDbContext dbContext) : IPortfolioSnapshotServ
             var unrealizedPlUsd = marketValueUsd - (runningQty * averageUnitCostUsd);
 
             positions.Add(new PositionSnapshotDto(
-                Isin: group.Key.Isin,
-                Symbol: group.Key.Symbol,
+                Isin: group.Key,
                 Quantity: runningQty,
                 AverageUnitCostUsd: Math.Round(averageUnitCostUsd, 4),
                 PriceUsd: Math.Round(priceUsd, 4),

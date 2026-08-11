@@ -56,13 +56,12 @@ namespace TradeService.Infrastructure.Migrations
                     ExternalRef = table.Column<string>(type: "nvarchar(100)", maxLength: 100, nullable: false),
                     AccountId = table.Column<string>(type: "nvarchar(50)", maxLength: 50, nullable: false),
                     Isin = table.Column<string>(type: "char(12)", nullable: false),
-                    Symbol = table.Column<string>(type: "nvarchar(20)", maxLength: 20, nullable: false),
                     Side = table.Column<string>(type: "nvarchar(10)", maxLength: 10, nullable: false),
                     Quantity = table.Column<decimal>(type: "decimal(18,4)", precision: 18, scale: 4, nullable: false),
                     Price = table.Column<decimal>(type: "decimal(18,4)", precision: 18, scale: 4, nullable: false),
                     TradeDate = table.Column<DateOnly>(type: "date", nullable: false),
                     AsOf = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false),
-                    CreatedAtUtc = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
+                    CreatedAt = table.Column<DateTimeOffset>(type: "datetimeoffset", nullable: false)
                 },
                 constraints: table =>
                 {

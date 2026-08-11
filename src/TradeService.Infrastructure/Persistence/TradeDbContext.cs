@@ -30,10 +30,6 @@ public class TradeDbContext(DbContextOptions<TradeDbContext> options) : DbContex
                 .HasColumnType("char(12)")
                 .IsRequired();
 
-            builder.Property(t => t.Symbol)
-                .HasMaxLength(20)
-                .IsRequired();
-
             builder.Property(t => t.Side)
                 .HasConversion<string>()
                 .HasMaxLength(10)
@@ -54,7 +50,7 @@ public class TradeDbContext(DbContextOptions<TradeDbContext> options) : DbContex
             builder.Property(t => t.AsOf)
                 .IsRequired();
 
-            builder.Property(t => t.CreatedAtUtc)
+            builder.Property(t => t.CreatedAt)
                 .IsRequired();
             
             builder.HasIndex(t => new { t.ExternalRef, t.AsOf }, "IX_Trades_ExternalRef_AsOf");

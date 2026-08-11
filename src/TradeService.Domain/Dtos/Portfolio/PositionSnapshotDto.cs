@@ -2,7 +2,6 @@
 
 public record PositionSnapshotDto(
     string Isin,
-    string Symbol,
     decimal Quantity,
     decimal AverageUnitCostUsd,
     decimal PriceUsd,
