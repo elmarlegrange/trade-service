@@ -1,97 +1,110 @@
-CREATE OR ALTER PROCEDURE dbo.usp_GetPortfolioSnapshot
-    @AccountId VARCHAR(50),
-    @ValuationDate DATE,
-    @AsOfCutoff DATETIME2(7) = NULL
+CREATE PROCEDURE dbo.usp_GetPortfolioSnapshot
+    @AccountId NVARCHAR(50),
+    @SnapshotDate DATE
 AS
 BEGIN
     SET NOCOUNT ON;
 
-    SET @AsOfCutoff = ISNULL(@AsOfCutoff, SYSUTCDATETIME());
-
-    WITH LatestTrades AS (
+    -- Deduplicate Trades: latest AsOf per ExternalRef up to @SnapshotDate
+    ;WITH RankedTrades AS (
         SELECT
-            t.ExternalRef,
-            t.AccountId,
-            t.Isin,
-            t.Side,
-            t.Quantity,
-            t.Price,
-            t.TradeDate,
-            t.AsOf,
+            t.Id, t.ExternalRef, t.AccountId, t.Isin, t.Side,
+            t.Quantity, t.Price, t.TradeDate, t.AsOf, t.CreatedAt,
             ROW_NUMBER() OVER (
                 PARTITION BY t.ExternalRef
-                ORDER BY t.AsOf DESC, t.Id DESC
-                ) AS RowNum
+                ORDER BY t.AsOf DESC, t.CreatedAt DESC
+                ) AS VersionRank
         FROM dbo.Trades t
         WHERE t.AccountId = @AccountId
-          AND t.TradeDate <= @ValuationDate
-          AND t.AsOf <= @AsOfCutoff
+          AND t.TradeDate <= @SnapshotDate
     ),
-         ValidActiveTrades AS (
-             SELECT
-                 ExternalRef,
-                 AccountId,
-                 Isin,
-                 Side,
-                 Quantity,
-                 Price,
-                 CASE WHEN Side = 'BUY' THEN Quantity ELSE -Quantity END AS SignedQuantity,
-                 CASE WHEN Side = 'BUY' THEN -(Quantity * Price) ELSE (Quantity * Price) END AS CashFlow
-             FROM LatestTrades
-             WHERE RowNum = 1
-         ),
-         PositionAggregates AS (
-             SELECT
-                 Isin,
-                 SUM(SignedQuantity) AS TotalQuantity,
-                 CASE
-                     WHEN SUM(CASE WHEN Side = 'BUY' THEN Quantity ELSE 0 END) > 0
-                         THEN SUM(CASE WHEN Side = 'BUY' THEN Quantity * Price ELSE 0 END)
-                         / SUM(CASE WHEN Side = 'BUY' THEN Quantity ELSE 0 END)
-                     ELSE 0
-                     END AS UnitCost
-             FROM ValidActiveTrades
-             GROUP BY Isin
-             HAVING SUM(SignedQuantity) <> 0
-         ),
-         LatestPrices AS (
-             SELECT
-                 p.Isin,
-                 p.Price AS MarketPrice,
-                 ROW_NUMBER() OVER (
-                     PARTITION BY p.Isin
-                     ORDER BY p.PriceDate DESC
-                     ) AS PriceRank
-             FROM dbo.Prices p
-             WHERE p.PriceDate <= @ValuationDate
-         )
+          ActiveTrades AS (
+              SELECT * FROM RankedTrades WHERE VersionRank = 1
+          ),
+          -- Aggregate Positions & Average Unit Cost Basis per Instrument
+          PositionAggregates AS (
+              SELECT
+                  at.Isin,
+                  SUM(CASE WHEN at.Side IN ('Buy', 'BUY') THEN at.Quantity
+                           WHEN at.Side IN ('Sell', 'SELL') THEN -at.Quantity
+                           ELSE 0 END) AS NetQuantity,
+                  SUM(CASE WHEN at.Side IN ('Buy', 'BUY') THEN at.Quantity * at.Price ELSE 0 END) AS TotalBuySpend,
+                  SUM(CASE WHEN at.Side IN ('Buy', 'BUY') THEN at.Quantity ELSE 0 END) AS TotalBuyQuantity
+              FROM ActiveTrades at
+              GROUP BY at.Isin
+              HAVING SUM(CASE WHEN at.Side IN ('Buy', 'BUY') THEN at.Quantity
+                              WHEN at.Side IN ('Sell', 'SELL') THEN -at.Quantity
+                              ELSE 0 END) > 0
+          ),
+          -- Resolve Latest Market Price on or before @SnapshotDate
+          RankedPrices AS (
+              SELECT
+                  p.Isin, p.Price, p.Currency, p.PriceDate,
+                  ROW_NUMBER() OVER (PARTITION BY p.Isin ORDER BY p.PriceDate DESC) AS PriceRank
+              FROM dbo.Prices p
+              WHERE p.PriceDate <= @SnapshotDate
+          ),
+          LatestPrices AS (
+              SELECT * FROM RankedPrices WHERE PriceRank = 1
+          ),
+          -- Resolve Latest FX Rate on or before @SnapshotDate
+          RankedFxRates AS (
+              SELECT
+                  fx.Pair, fx.Rate, fx.RateDate,
+                  ROW_NUMBER() OVER (PARTITION BY fx.Pair ORDER BY fx.RateDate DESC) AS FxRank
+              FROM dbo.FxRates fx
+              WHERE fx.RateDate <= @SnapshotDate
+          ),
+          LatestFxRates AS (
+              SELECT * FROM RankedFxRates WHERE FxRank = 1
+          ),
+          -- Value Positions in USD
+          ValuedPositions AS (
+              SELECT
+                  pa.Isin,
+                  pa.NetQuantity AS Quantity,
+                  CAST(ROUND(pa.TotalBuySpend / NULLIF(pa.TotalBuyQuantity, 0), 4) AS DECIMAL(18, 4)) AS AverageUnitCostUsd,
+                  CAST(ROUND(
+                          CASE
+                              WHEN lp.Currency = 'USD' OR lp.Currency IS NULL THEN ISNULL(lp.Price, 0.0)
+                              ELSE ISNULL(lp.Price, 0.0) / NULLIF(lfx.Rate, 1.0)
+                              END, 4) AS DECIMAL(18, 4)) AS PriceUsd,
+                  CAST(ROUND(
+                          pa.NetQuantity *
+                          CASE
+                              WHEN lp.Currency = 'USD' OR lp.Currency IS NULL THEN ISNULL(lp.Price, 0.0)
+                              ELSE ISNULL(lp.Price, 0.0) / NULLIF(lfx.Rate, 1.0)
+                              END, 4) AS DECIMAL(18, 4)) AS MarketValueUsd,
+                  CAST(ROUND(
+                          (pa.NetQuantity *
+                           CASE
+                               WHEN lp.Currency = 'USD' OR lp.Currency IS NULL THEN ISNULL(lp.Price, 0.0)
+                               ELSE ISNULL(lp.Price, 0.0) / NULLIF(lfx.Rate, 1.0)
+                               END) - (pa.NetQuantity * (pa.TotalBuySpend / NULLIF(pa.TotalBuyQuantity, 0))), 4) AS DECIMAL(18, 4)) AS UnrealizedPlUsd
+              FROM PositionAggregates pa
+                       LEFT JOIN LatestPrices lp ON pa.Isin = lp.Isin
+                       LEFT JOIN LatestFxRates lfx ON lfx.Pair = CONCAT('USD-', LTRIM(RTRIM(lp.Currency)))
+          )
+     -- select into a temp table for multi-query access
+     SELECT *
+     INTO #ValuedPositions
+     FROM ValuedPositions;
 
-    SELECT
-        pa.Isin,
-        pa.TotalQuantity AS Quantity,
-        ROUND(pa.UnitCost, 4) AS UnitCostUSD,
-        ISNULL(lp.MarketPrice, 0) AS MarketPriceUSD,
-        ROUND(pa.TotalQuantity * ISNULL(lp.MarketPrice, 0), 2) AS MarketValueUSD,
-        ROUND((pa.TotalQuantity * ISNULL(lp.MarketPrice, 0)) - (pa.TotalQuantity * pa.UnitCost), 2) AS UnrealizedPnLUSD
-    INTO #InstrumentSummary
-    FROM PositionAggregates pa
-             LEFT JOIN LatestPrices lp ON pa.Isin = lp.Isin AND lp.PriceRank = 1;
+    -- Result Set 1: Instrument-Level Positions
+    SELECT Isin, Quantity, AverageUnitCostUsd, PriceUsd, MarketValueUsd, UnrealizedPlUsd
+    FROM #ValuedPositions
+    ORDER BY Isin;
 
-    SELECT
-        Isin,
-        Quantity,
-        UnitCostUSD,
-        MarketPriceUSD,
-        MarketValueUSD,
-        UnrealizedPnLUSD
-    FROM #InstrumentSummary;
-
+    -- Result Set 2: Account-Level Summary
     SELECT
         @AccountId AS AccountId,
-        @ValuationDate AS ValuationDate,
-        ISNULL(SUM(MarketValueUSD), 0) AS TotalMarketValueUSD
-    FROM #InstrumentSummary;
+        @SnapshotDate AS SnapshotDate,
+        ISNULL(SUM(MarketValueUsd), 0.00) AS TotalMarketValueUsd,
+        ISNULL(SUM(UnrealizedPlUsd), 0.00) AS TotalUnrealizedPlUsd,
+        COUNT(Isin) AS PositionCount
+    FROM #ValuedPositions;
 
-    DROP TABLE #InstrumentSummary;
+    DROP TABLE IF EXISTS #ValuedPositions;
+
 END;
-GO
+go

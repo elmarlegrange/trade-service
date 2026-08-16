@@ -24,8 +24,7 @@ public class TradeIntegrationTests(TradeServiceApiFactory factory) : IClassFixtu
         var initialAsOf = new DateTimeOffset(2025, 3, 1, 9, 0, 0, TimeSpan.Zero);
         var duplicateAsOf = new DateTimeOffset(2025, 3, 1, 8, 50, 0, TimeSpan.Zero);
         var correctionAsOf = new DateTimeOffset(2025, 3, 1, 10, 30, 0, TimeSpan.Zero);
-
-        // 1. Submit Initial Trade (100 units @ $150)
+        
         var initialTradeRequest = new TradeIngestionRequest(
             ExternalRef: externalRef,
             AccountId: accountId,
@@ -45,8 +44,7 @@ public class TradeIntegrationTests(TradeServiceApiFactory factory) : IClassFixtu
         initialResponseBody!.Status.Should().Be("Created");
         initialResponseBody.ExternalRef.Should().Be(externalRef);
         initialResponseBody.InternalId.Should().NotBeEmpty();
-
-        // 2. Submit Duplicate Trade (same ExternalRef, equal or earlier AsOf) -> Expect 200 OK / IgnoredDuplicate
+        
         var duplicateTradeRequest = new TradeIngestionRequest(
             ExternalRef: externalRef,
             AccountId: accountId,
@@ -65,8 +63,7 @@ public class TradeIntegrationTests(TradeServiceApiFactory factory) : IClassFixtu
         duplicateResponseBody.Should().NotBeNull();
         duplicateResponseBody!.Status.Should().Be("IgnoredDuplicate");
         duplicateResponseBody.ExternalRef.Should().Be(externalRef);
-
-        // 3. Submit Correction Trade (same ExternalRef, later AsOf, updated Quantity = 120) -> Expect 201 Created / CorrectionApplied
+        
         var correctionTradeRequest = new TradeIngestionRequest(
             ExternalRef: externalRef,
             AccountId: accountId,
@@ -85,8 +82,7 @@ public class TradeIntegrationTests(TradeServiceApiFactory factory) : IClassFixtu
         correctionResponseBody.Should().NotBeNull();
         correctionResponseBody!.Status.Should().Be("CorrectionApplied");
         correctionResponseBody.ExternalRef.Should().Be(externalRef);
-
-        // 4. Verify Portfolio Snapshot
+        
         var snapshotResponse = await _client.GetAsync($"/api/v1/portfolios/{accountId}/snapshot?date=2025-03-01");
         snapshotResponse.StatusCode.Should().Be(HttpStatusCode.OK);
 
@@ -94,7 +90,7 @@ public class TradeIntegrationTests(TradeServiceApiFactory factory) : IClassFixtu
         snapshotResponseBody.Should().NotBeNull();
         snapshotResponseBody!.AccountId.Should().Be(accountId);
         snapshotResponseBody.SnapshotDate.Should().Be(tradeDate);
-        snapshotResponseBody.TotalValueUsd.Should().Be(18000.00m); // 120 units * $150.00 price
+        snapshotResponseBody.TotalValueUsd.Should().Be(18000.00m);
         snapshotResponseBody.Positions.Should().HaveCount(1);
 
         var position = snapshotResponseBody.Positions.Single();

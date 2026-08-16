@@ -1,5 +1,5 @@
+using System.ComponentModel.DataAnnotations;
 using Microsoft.AspNetCore.Mvc;
-using TradeService.Domain.Dtos;
 using TradeService.Domain.Dtos.Portfolio;
 using TradeService.Domain.Interfaces;
 
@@ -11,15 +11,10 @@ public class PortfolioController(IPortfolioSnapshotService portfolioService) : C
 {
     [HttpGet("{accountId}/snapshot")]
     public async Task<ActionResult<PortfolioSnapshotResponse>> GetSnapshot(
-        [FromRoute] string accountId,
-        [FromQuery] DateOnly date,
+        [FromRoute, Required(AllowEmptyStrings = false)] string accountId,
+        [FromQuery, Required] DateOnly date,
         CancellationToken ct)
     {
-        if (string.IsNullOrWhiteSpace(accountId))
-        {
-            return BadRequest("AccountId must be specified.");
-        }
-
         var snapshot = await portfolioService.GetSnapshotAsync(accountId, date, ct);
         return Ok(snapshot);
     }

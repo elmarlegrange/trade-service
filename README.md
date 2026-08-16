@@ -55,17 +55,14 @@ By default, the Web API will start and expose Swagger UI at:
 **Sample Request Body (Initial Trade)**:
 ```json
 {
-  "externalRef": "TRD-1001",
-  "accountId": "ACC-500",
-  "instrument": {
-    "isin": "US0378331005",
-    "symbol": "AAPL"
-  },
-  "side": "BUY",
-  "quantity": 100.0,
-  "price": 150.00,
-  "tradeDate": "2025-03-01",
-  "asOf": "2025-03-01T09:00:00Z"
+  "externalRef": "TRD-1002",
+  "accountId": "ACC-001",
+  "isin": "US0378331005",
+  "side": "Buy",
+  "quantity": 10,
+  "price": 150,
+  "tradeDate": "2026-08-16",
+  "asOf": "2026-08-16T20:45:39.998Z"
 }
 ```
 
@@ -77,23 +74,25 @@ By default, the Web API will start and expose Swagger UI at:
 ---
 
 ### 2. Get Portfolio Snapshot
-- **Endpoint**: `GET /api/v1/portfolios/{accountId}/snapshot?date=2025-03-01`
+- **Endpoint**: `GET /api/v1/portfolios/{accountId}/snapshot?date=2026-08-16`
+
+**Sample Request**:
+**Endpoint**: `GET /api/v1/portfolios/ACC-001/snapshot?date=2026-08-16`
 
 **Sample Response Body**:
 ```json
 {
-  "accountId": "ACC-500",
-  "snapshotDate": "2025-03-01",
-  "totalValueUsd": 18000.0,
+  "accountId": "ACC-001",
+  "snapshotDate": "2026-08-16",
+  "totalValueUsd": 18000,
   "positions": [
     {
       "isin": "US0378331005",
-      "symbol": "AAPL",
-      "quantity": 120.0,
-      "averageUnitCostUsd": 150.0,
-      "priceUsd": 150.0,
-      "marketValueUsd": 18000.0,
-      "unrealizedPlUsd": 0.0
+      "quantity": 120,
+      "averageUnitCostUsd": 150,
+      "priceUsd": 150,
+      "marketValueUsd": 18000,
+      "unrealizedPlUsd": 0
     }
   ]
 }
